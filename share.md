@@ -1,136 +1,90 @@
-### **Hướng 1: Explainable AI (XAI) for Diagnosing Customer Segments**
-
-**Tên dự án:** "Diagnosing Customer Dynamics: An Explainable AI Framework for Segment Classification and Transition Analysis"
-
-**Mục tiêu:** Giải thích *tại sao* một khách hàng thuộc về một phân khúc nhất định và *nguyên nhân* gây ra sự chuyển đổi phân khúc.
-
-#### **Pipeline chi tiết:**
-
-**1. Xử lý dữ liệu (Data Processing):**
-*   **Input:** Dữ liệu giao dịch thô (CustomerID, InvoiceNo, StockCode, Quantity, Price, InvoiceDate).
-*   **Bước 1: Tiền xử lý giao dịch:**
-    *   Loại bỏ các giao dịch không hợp lệ (hủy đơn, thiếu CustomerID).
-    *   Tạo cột `TotalPrice = Quantity * Price`.
-*   **Bước 2: Xây dựng bộ dữ liệu RFM:**
-    *   Chọn một ngày chốt sổ (`snapshot_date`).
-    *   Tính toán R (Recency), F (Frequency), M (Monetary) cho mỗi khách hàng.
-    *   **Kết quả:** Một bảng dữ liệu `customer_rfm` với các cột `[CustomerID, Recency, Frequency, Monetary]`.
-*   **Bước 3: Chuẩn bị dữ liệu cho mô hình:**
-    *   Xử lý ngoại lệ (IQR method).
-    *   Áp dụng Box-Cox transformation để giảm độ xiên (skewness).
-    *   Chuẩn hóa dữ liệu bằng `StandardScaler`.
-    *   **Kết quả:** Dữ liệu RFM đã được chuẩn hóa, sẵn sàng cho việc phân cụm và phân loại.
-
-**2. Xây dựng Mô hình (Model Building):**
-*   **Bước 1: Phân cụm và Gán nhãn (Unsupervised Phase):**
-    *   Sử dụng K-Means trên dữ liệu RFM đã chuẩn hóa để phân khách hàng thành K cụm.
-    *   Phân tích các centroid của từng cụm để gán nhãn có ý nghĩa kinh doanh (e.g., 'VIP', 'Loyal', 'At-Risk').
-    *   Thêm cột `Segment` vào bảng `customer_rfm`.
-*   **Bước 2: Xây dựng Mô hình Phân loại (Supervised Phase):**
-    *   **Features (X):** `[Recency, Frequency, Monetary]` (đã chuẩn hóa).
-    *   **Target (y):** `Segment` (nhãn đã gán).
-    *   Chọn một mô hình phân loại mạnh, có thể giải thích được bằng SHAP. **XGBoost** là lựa chọn lý tưởng.
-*   **Bước 3: Xây dựng Bộ giải thích (Explainer Building):**
-    *   Sử dụng thư viện `shap`.
-    *   Khởi tạo một `shap.TreeExplainer` dựa trên mô hình XGBoost đã huấn luyện.
-
-**3. Huấn luyện Mô hình (Model Training):**
-*   Chia bộ dữ liệu `customer_rfm` thành tập train (80%) và test (20%).
-*   Huấn luyện mô hình XGBoost trên tập train.
-
-**4. Đánh giá Hiệu suất (Performance Evaluation):**
-*   **Đánh giá Mô hình Phân loại (Classification Model):**
-    *   **Accuracy, Precision, Recall, F1-Score (Macro/Weighted):** Đo lường khả năng của mô hình XGBoost trong việc tái tạo lại các nhãn của K-Means. Mục tiêu là đạt độ chính xác rất cao (>98%) để chứng minh mô hình đã "học" được các ranh giới.
-    *   **Confusion Matrix:** Để xem mô hình nhầm lẫn giữa các lớp nào.
-*   **Đánh giá Hệ thống Giải thích (Explanation System) - *Đây là phần cốt lõi và mới mẻ***:
-    *   **Đánh giá định tính (Qualitative Evaluation):**
-        *   **Case Studies:** Chọn các trường hợp khách hàng cụ thể (ví dụ: một khách hàng VIP, một khách hàng At-Risk, một khách hàng vừa chuyển đổi) và trình bày các biểu đồ giải thích (force plot, waterfall plot cho `Delta_SHAP`). Phân tích xem các giải thích này có hợp lý và phù hợp với trực giác kinh doanh không.
-    *   **Đánh giá định lượng (Quantitative Evaluation - Nâng cao):**
-        *   **Fidelity:** Đo lường mức độ mà lời giải thích của SHAP khớp với dự đoán của mô hình "hộp đen" XGBoost. (Thường thì SHAP có độ trung thực cao với các mô hình cây).
-        *   **Stability/Robustness:** Kiểm tra xem một thay đổi nhỏ trong đầu vào có dẫn đến một thay đổi lớn trong lời giải thích không. Lời giải thích tốt nên ổn định.
-        *   **(Tùy chọn) User Study:** Thiết kế khảo sát để người dùng (ví dụ: chuyên gia marketing) đánh giá mức độ **dễ hiểu (intelligibility)** và **hữu ích (usefulness)** của các lời giải thích. Đây là thước đo vàng cho một hệ thống XAI.
-
-#### **Đánh giá Độ khả thi (Feasibility Assessment):**
-
-*   **Độ khó kỹ thuật:** **Trung bình.** Các công cụ (XGBoost, SHAP) đã có sẵn và được tài liệu hóa tốt. Thách thức chính nằm ở việc thiết kế phương pháp luận "Differential Explanation" và trình bày kết quả một cách thuyết phục.
-*   **Yêu cầu dữ liệu:** **Thấp.** Có thể sử dụng lại bộ dữ liệu từ bài báo trước.
-*   **Rủi ro:** **Thấp.** Hướng đi này có rủi ro thất bại thấp vì các công cụ nền tảng đã rất mạnh. Thành công chủ yếu phụ thuộc vào khả năng diễn giải và trình bày kết quả.
-*   **Kết luận:** **Rất khả thi.** Đây là một hướng đi an toàn, thời sự và có tiềm năng đóng góp cao.
+**Hướng 3: Dự báo Chuyển đổi Phân khúc (Predicting Segment Transitions)**.
 
 ---
 
-### **Hướng 2: Time Series - Dự báo Giao dịch Tiếp theo**
+### **Hướng 3: Time Series for Next Segment Prediction**
 
-**Tên dự án:** "When and What Will They Buy Next? A Multi-Task Learning Framework for Predicting Next Purchase Time and Product Category"
+**Tên dự án:** "Forecasting Customer Journeys: A Sequential Approach to Predicting Future Segment Membership"
 
-**Mục tiêu:** Xây dựng một mô hình duy nhất có thể dự đoán hai việc cùng lúc: (1) **Khi nào** khách hàng sẽ mua hàng lần tiếp theo? (2) **Họ sẽ mua sản phẩm thuộc danh mục nào?**
+**Mục tiêu:** Dựa trên chuỗi lịch sử RFM và phân khúc của một khách hàng, dự đoán phân khúc của họ sẽ là gì sau một khoảng thời gian Δt (ví dụ: sau 30 ngày hoặc sau giao dịch tiếp theo).
 
 #### **Pipeline chi tiết:**
 
-**1. Xử lý dữ liệu (Data Processing):**
-*   **Input:** Dữ liệu giao dịch thô (CustomerID, InvoiceNo, StockCode, Quantity, Price, InvoiceDate).
-*   **Bước 1: Tiền xử lý và Làm giàu dữ liệu:**
-    *   Loại bỏ giao dịch không hợp lệ.
-    *   Sắp xếp giao dịch của mỗi khách hàng theo `InvoiceDate`.
-    *   **Tạo đặc trưng chuỗi thời gian:**
-        *   `inter_purchase_time`: Khoảng thời gian (số ngày) giữa hai giao dịch liên tiếp.
-        *   `transaction_value`: Tổng giá trị của một giao dịch.
-        *   `product_categories`: Danh sách các danh mục sản phẩm trong một giao dịch (cần có một hệ thống phân loại sản phẩm, ví dụ: 'Home Decor', 'Kitchenware').
-*   **Bước 2: Xây dựng chuỗi đầu vào (Input Sequences):**
-    *   Đối với mỗi khách hàng, tạo ra các chuỗi (sequences) có độ dài cố định `L` (ví dụ: `L=5` giao dịch cuối cùng).
-    *   Mỗi phần tử trong chuỗi là một vector đặc trưng của một giao dịch (ví dụ: `[transaction_value, num_items, num_categories, ...]`).
-*   **Bước 3: Xây dựng mục tiêu (Target Variables):**
-    *   **Target 1 (Regression):** `time_to_next_purchase` (số ngày từ giao dịch cuối cùng trong chuỗi đến giao dịch tiếp theo).
-    *   **Target 2 (Classification):** `next_purchase_category` (danh mục sản phẩm chính của giao dịch tiếp theo, dạng one-hot encoded).
-    *   **Kết quả:** Một bộ dữ liệu gồm các cặp `(Input_Sequence, [Target1, Target2])`.
+**1. Xử lý dữ liệu (Data Processing) - *Đây là bước quan trọng và khác biệt***:
+
+*   **Input:** Dữ liệu giao dịch thô.
+*   **Bước 1: Tạo "Snapshots" theo thời gian:**
+    *   Thay vì chỉ tính RFM tại một `snapshot_date` duy nhất, hãy tạo ra các "ảnh chụp" (snapshots) của RFM cho mỗi khách hàng tại thời điểm của **mỗi giao dịch của họ**.
+    *   Ví dụ, khách hàng A có 3 giao dịch vào ngày D1, D2, D3. Bạn sẽ có 3 bộ RFM:
+        *   `RFM_1` (tính tại ngày D1)
+        *   `RFM_2` (tính tại ngày D2, so với D1)
+        *   `RFM_3` (tính tại ngày D3, so với D2)
+*   **Bước 2: Gán nhãn phân khúc cho mỗi Snapshot:**
+    *   Sử dụng mô hình phân loại (XGBoost) đã được huấn luyện từ bài báo gốc để gán nhãn phân khúc cho **từng bộ RFM tại mỗi thời điểm**.
+    *   **Kết quả:** Mỗi khách hàng giờ đây có một chuỗi lịch sử, ví dụ: `[(RFM_1, 'New'), (RFM_2, 'Potential'), (RFM_3, 'Loyal')]`.
+*   **Bước 3: Xây dựng Chuỗi Đầu vào và Mục tiêu (Input Sequences & Target):**
+    *   Sử dụng kỹ thuật cửa sổ trượt (sliding window) có độ dài `L` trên chuỗi lịch sử của mỗi khách hàng.
+    *   **Input Sequence (X):** Một chuỗi gồm `L` phần tử. Mỗi phần tử là một vector kết hợp `[Recency_t, Frequency_t, Monetary_t, Segment_t (dạng one-hot)]`.
+    *   **Target (y):** Phân khúc tại thời điểm `t+1` (`Segment_t+1`, dạng one-hot).
+    *   **Ví dụ:** Nếu `L=3`, input sẽ là `[(RFM_1, Seg_1), (RFM_2, Seg_2), (RFM_3, Seg_3)]` và target sẽ là `Seg_4`.
 
 **2. Xây dựng Mô hình (Model Building):**
-*   **Kiến trúc Multi-Task Learning (MTL):**
-    *   **Shared Bottom:** Một hoặc nhiều lớp **LSTM** hoặc **GRU** để học biểu diễn (representation) từ chuỗi giao dịch đầu vào. Lớp này nắm bắt "trạng thái" của khách hàng.
-    *   **Task-Specific Heads:**
-        *   **Regression Head:** Một vài lớp `Dense` nối tiếp từ Shared Bottom, với lớp cuối cùng có 1 neuron và hàm kích hoạt `linear` (hoặc `relu` để đảm bảo không âm) để dự đoán `time_to_next_purchase`.
-        *   **Classification Head:** Một vài lớp `Dense` khác nối tiếp từ Shared Bottom, với lớp cuối cùng có `N` neuron (N là số danh mục sản phẩm) và hàm kích hoạt `softmax` để dự đoán `next_purchase_category`.
+
+*   **Kiến trúc:** Đây là một bài toán phân loại chuỗi (sequence classification). Các mô hình phù hợp bao gồm:
+    *   **LSTM/GRU:** Lựa chọn kinh điển và mạnh mẽ. Một hoặc hai lớp LSTM/GRU để nắm bắt các phụ thuộc thời gian trong chuỗi hành vi của khách hàng.
+    *   **Attention-based Models (ví dụ: Transformers):** Có thể hiệu quả hơn nếu cần nắm bắt các mối quan hệ xa trong chuỗi (ví dụ: hành vi từ rất lâu trong quá khứ ảnh hưởng đến tương lai). Tuy nhiên, phức tạp hơn để triển khai.
+*   **Kiến trúc cụ thể (với LSTM):**
+    *   Lớp `Input` với shape `(L, num_features)`.
+    *   Lớp `LSTM` (ví dụ: 64 units).
+    *   Lớp `Dropout` để chống overfitting.
+    *   Lớp `Dense` (lớp cuối) với `K` units (K là số phân khúc) và hàm kích hoạt `softmax`.
 
 **3. Huấn luyện Mô hình (Model Training):**
-*   **Loss Function:** Một hàm loss kết hợp. `Total_Loss = w1 * Loss_Regression + w2 * Loss_Classification`.
-    *   `Loss_Regression`: Mean Squared Error (MSE) hoặc Mean Absolute Error (MAE).
-    *   `Loss_Classification`: Categorical Cross-Entropy.
-    *   `w1`, `w2` là các trọng số để cân bằng giữa hai nhiệm vụ.
-*   Chia dữ liệu theo thời gian (time-based split) để tránh data leakage. Dùng các giao dịch cũ để huấn luyện và các giao dịch mới hơn để kiểm thử.
-*   Huấn luyện mô hình MTL bằng cách tối ưu hóa `Total_Loss`.
+
+*   **Loss Function:** `CategoricalCrossentropy`.
+*   **Optimizer:** `Adam`.
+*   **Data Splitting:** Phải chia dữ liệu theo thời gian. Ví dụ, dùng dữ liệu từ tháng 1-9 để huấn luyện và tháng 10-12 để kiểm thử, nhằm đảm bảo mô hình đang dự đoán tương lai thực sự, không phải nội suy.
+*   Huấn luyện mô hình để tối thiểu hóa loss function.
 
 **4. Đánh giá Hiệu suất (Performance Evaluation):**
-*   **Đánh giá Nhiệm vụ Dự báo Thời gian (Regression Task):**
-    *   **Mean Absolute Error (MAE):** "Trung bình, mô hình dự đoán sai lệch bao nhiêu ngày?" (Dễ diễn giải).
-    *   **Root Mean Squared Error (RMSE):** Tương tự MAE nhưng trừng phạt các lỗi lớn nặng hơn.
-    *   **R-squared (R²):** Đo lường mức độ mà mô hình giải thích được sự biến thiên của dữ liệu.
-*   **Đánh giá Nhiệm vụ Dự báo Sản phẩm (Classification Task):**
-    *   **Accuracy:** Tỷ lệ dự đoán đúng danh mục.
-    *   **Top-k Accuracy:** Tỷ lệ mà danh mục đúng nằm trong top k dự đoán hàng đầu của mô hình (ví dụ: k=3). Điều này hữu ích vì gợi ý một vài sản phẩm cũng đã có giá trị.
-    *   **Precision, Recall, F1-Score (per-category và macro/weighted):** Để đánh giá hiệu suất trên từng danh mục.
 
-#### **Đánh giá Độ khả thi (Feasibility Assessment):**
-
-*   **Độ khó kỹ thuật:** **Cao.** Đòi hỏi kiến thức vững về deep learning (RNNs, LSTMs), multi-task learning, và xử lý dữ liệu chuỗi thời gian. Việc chuẩn bị dữ liệu và huấn luyện mô hình phức tạp hơn đáng kể.
-*   **Yêu cầu dữ liệu:** **Cao.** Cần dữ liệu giao dịch dày đặc và kéo dài theo thời gian cho mỗi khách hàng để tạo ra các chuỗi có ý nghĩa. Ngoài ra, cần có một hệ thống phân loại sản phẩm (product categorization), thứ không có sẵn trong bộ dữ liệu Online Retail.
-*   **Rủi ro:** **Cao.** Mô hình có thể không hội tụ, hoặc một nhiệm vụ có thể lấn át nhiệm vụ kia. Việc tinh chỉnh các trọng số loss và kiến trúc mô hình đòi hỏi nhiều thử nghiệm. Dữ liệu không đủ tốt có thể dẫn đến kết quả kém.
-*   **Kết luận:** **Khả thi nhưng đầy thách thức.** Hướng đi này rất tham vọng và có tiềm năng đột phá cao. Tuy nhiên, nó đòi hỏi nền tảng kỹ thuật vững chắc và có thể gặp trở ngại lớn ở khâu chuẩn bị dữ liệu.
+*   **Đây là một bài toán phân loại đa lớp (multi-class classification).**
+*   **Các chỉ số chính:**
+    *   **Accuracy:** Tỷ lệ dự đoán đúng phân khúc tiếp theo.
+    *   **Precision, Recall, F1-Score (Macro/Weighted):** Cực kỳ quan trọng, vì các phân khúc có thể không cân bằng. Ví dụ, việc dự đoán đúng một khách hàng sẽ chuyển sang 'At-Risk' (Recall cao cho lớp 'At-Risk') có giá trị hơn nhiều so với các lỗi khác.
+    *   **Confusion Matrix:** Để xem mô hình thường nhầm lẫn giữa các cặp chuyển đổi nào. Ví dụ, nó có hay nhầm `Loyal` -> `VIP` với `Loyal` -> `Loyal` không? Điều này cung cấp insight sâu sắc về "ranh giới" giữa các phân khúc.
+    *   **Area Under the ROC Curve (AUC-ROC), One-vs-Rest:** Đánh giá khả năng phân biệt của mô hình cho từng lớp. AUC cao cho lớp 'At-Risk' có nghĩa là mô hình rất giỏi trong việc xác định các khách hàng có nguy cơ rời bỏ.
 
 ---
 
-### **So sánh và Khuyến nghị**
+### **Đánh giá Độ khả thi và So sánh**
 
-| Tiêu chí | Hướng 1: XAI | Hướng 2: Time Series Prediction |
-| :--- | :--- | :--- |
-| **Mục tiêu** | Giải thích (WHY) | Dự báo (WHAT & WHEN) |
-| **Độ mới** | Cao | Rất cao |
-| **Độ khó** | **Trung bình** | **Cao** |
-| **Rủi ro** | **Thấp** | **Cao** |
-| **Yêu cầu dữ liệu** | **Thấp** | **Cao** |
-| **Pipeline** | Tương đối thẳng | Phức tạp, nhiều bước |
-| **Tiềm năng đóng góp** | Thực tiễn, dễ áp dụng | Đột phá, giá trị kinh doanh cao |
+| Tiêu chí | Hướng 3: Segment Prediction | Hướng 1: XAI | Hướng 2: Next Purchase Prediction |
+| :--- | :--- | :--- | :--- |
+| **Mục tiêu** | Dự báo trạng thái (WHICH SEGMENT) | Giải thích (WHY) | Dự báo hành động (WHAT & WHEN) |
+| **Độ mới** | **Cao** | Cao | Rất cao |
+| **Độ khó** | **Trung bình đến Cao** | Trung bình | Cao |
+| **Rủi ro** | **Trung bình** | Thấp | Cao |
+| **Yêu cầu dữ liệu** | **Trung bình** (Cần dữ liệu chuỗi, nhưng không cần thông tin sản phẩm) | Thấp | Cao |
+| **Giá trị kinh doanh**| **Rất cao.** Cho phép marketing **chủ động (proactive)**. Thay vì đợi khách hàng thành 'At-Risk' mới hành động, có thể can thiệp ngay khi mô hình dự báo họ *sắp* chuyển sang trạng thái đó. | Cao. Giúp marketing **phản ứng (reactive)** một cách thông minh hơn. | Rất cao. Cho phép các chiến dịch marketing siêu cá nhân hóa. |
 
-**Khuyến nghị:**
+#### **Phân tích chi tiết về Độ khả thi của Hướng 3:**
 
-*   Nếu bạn muốn một dự án có **tỷ lệ thành công cao, rủi ro thấp, và có thể hoàn thành trong một khung thời gian hợp lý**, hãy chọn **Hướng 1: XAI**. Nó xây dựng trực tiếp trên nền tảng bạn đã có và giải quyết một vấn đề rất thời sự.
-*   Nếu bạn và nhóm của bạn có **nền tảng deep learning vững chắc, sẵn sàng đối mặt với thách thức kỹ thuật và có thể tìm được nguồn dữ liệu phù hợp** (hoặc tạo ra hệ thống phân loại sản phẩm), hãy chọn **Hướng 2: Time Series Prediction**. Nếu thành công, đây sẽ là một công trình nghiên cứu rất ấn tượng và có sức ảnh hưởng lớn.
+*   **Ưu điểm so với Hướng 2 (Next Purchase Prediction):**
+    *   **Đơn giản hơn về dữ liệu:** Không yêu cầu hệ thống phân loại sản phẩm. Bạn chỉ cần dữ liệu giao dịch cơ bản.
+    *   **Vấn đề được xác định rõ ràng hơn:** Mục tiêu (K phân khúc) là một không gian hữu hạn và có cấu trúc, dễ mô hình hóa hơn là dự đoán một sản phẩm cụ thể trong hàng ngàn sản phẩm.
+*   **Thách thức chính:**
+    *   **Xử lý dữ liệu:** Việc tạo ra các chuỗi snapshot một cách chính xác là bước tốn nhiều công sức nhất và dễ xảy ra lỗi.
+    *   **Tính ổn định của phân khúc:** Mô hình này giả định rằng định nghĩa các phân khúc là tương đối ổn định theo thời gian. Nếu bạn tái huấn luyện mô hình K-Means và định nghĩa các phân khúc thay đổi hoàn toàn, mô hình dự báo chuỗi thời gian sẽ trở nên vô dụng. Đây là một điểm yếu cần được thảo luận trong bài báo.
+*   **Rủi ro:** Rủi ro kỹ thuật ở mức trung bình. Thách thức lớn nhất là có đủ dữ liệu chuỗi dài và chất lượng để mô hình học được các pattern có ý nghĩa. Nếu khách hàng chỉ có 1-2 giao dịch, họ sẽ không đóng góp được vào việc huấn luyện mô hình này.
+
+### **Kết luận và Khuyến nghị**
+
+**Hướng 3 (Dự báo Chuyển đổi Phân khúc) là một lựa chọn tuyệt vời và cân bằng.**
+
+*   Nó **tham vọng và mới mẻ hơn** so với hướng XAI thuần túy (Hướng 1).
+*   Nó **khả thi và ít rủi ro hơn** so với việc dự báo sản phẩm/thời gian cụ thể (Hướng 2).
+*   Nó xây dựng một cách tự nhiên dựa trên kết quả của bài báo gốc (sử dụng các nhãn phân khúc làm mục tiêu).
+*   Nó giải quyết một bài toán kinh doanh cực kỳ giá trị: **chuyển từ marketing phản ứng sang marketing chủ động.**
+
+Nếu bạn muốn đẩy nghiên cứu của mình lên một tầm cao mới mà không phải đối mặt với rủi ro kỹ thuật quá lớn, **đây chính là hướng đi lý tưởng.**
